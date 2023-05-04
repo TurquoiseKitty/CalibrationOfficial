@@ -13,11 +13,11 @@ def CHECK_MCdrop():
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
 
-    X_train = np.linspace(0,15,40000)
-    Y_train = DEFAULT_mean_func(X_train) + np.random.randn(40000)
+    X_train = np.linspace(0,15,4000)
+    Y_train = DEFAULT_mean_func(X_train) + 1*np.random.randn(4000)
 
     X_val = np.linspace(0, 15, 1000)
-    Y_val = DEFAULT_mean_func(X_val) + np.random.randn(1000)
+    Y_val = DEFAULT_mean_func(X_val) + 1*np.random.randn(1000)
 
     y_pred = DEFAULT_mean_func(X_val)
 
@@ -33,13 +33,15 @@ def CHECK_MCdrop():
 
     MC_model = MC_dropnet(
         n_input = 1,
-        drop_rate= 0.2,
-        hidden_layers= [10, 10, 10]
+        drop_rate= 0.1,
+        hidden_layers= [10, 10]
     )
 
     MC_model.train(X_train, Y_train, X_val, Y_val,
-                   LR = 1E-3,
-                   early_stopping=False)
+                bat_size = 10,
+                LR = 5E-3,
+                N_Epoch = 100,
+                early_stopping=False)
 
 
     output = MC_model.predict(X_val)
@@ -70,7 +72,7 @@ def CHECK_MCdrop():
     )
 
     plot_xy_specifyBound(
-        y_pred = y_pred,
+        y_pred = means.cpu().numpy(),
 
         y_UP = pred_UP,
         y_LO = pred_LO,

@@ -138,7 +138,7 @@ class MC_dropnet(raw_net):
             epistemic = samples.var(dim = 0)**0.5
             total_unc = (aleatoric**2 + epistemic**2)**0.5
 
-            return torch.stack((mean_preds, total_unc), dim = 1)
+            return torch.stack((mean_preds, aleatoric), dim = 1)
 
 
 
