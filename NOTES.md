@@ -1,0 +1,1 @@
+1. Add `"env": {"PYTHONPATH": "${workspaceFolder}"}` to `launch.json` to run code checks.
