@@ -3,12 +3,13 @@ import numpy as np
 from scipy import stats
 from src.DEFAULTS import normalZ, Upper_quant, Lower_quant, DEFAULT_mean_func, DEFAULT_layers
 import matplotlib.pyplot as plt
-from src.GPmodels import oneLayer_DeepGP
+from src.models import vanilla_predNet
 import torch
 from src.evaluations import mu_sig_toQuants
+from src.losses import mse_loss, rmse_loss
 
 
-def CHECK_GPmodel():
+def CHECK_Pred():
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
@@ -31,25 +32,35 @@ def CHECK_GPmodel():
     Y_train = torch.Tensor(Y_train).cuda()
     Y_val = torch.Tensor(Y_val).cuda()
 
-    GP_model = oneLayer_DeepGP(
-        in_dim = 1, hidden_dim = 12
+    pred_model = vanilla_predNet(
+        n_input = 1,
+        hidden_layers= [10, 10]
     )
 
+    pred_model.train(X_train, Y_train, X_val, Y_val,
+                bat_size = 10,
+                LR = 5E-3,
+                N_Epoch = 100,
+                early_stopping=True,
 
-    GP_model.train(
-        X_train, Y_train, X_val, Y_val
-    )
+                train_loss = mse_loss,
+                val_loss_criterias = {
+                    "mse" : mse_loss,
+                    "rmse": rmse_loss
+                },
+                monitor_name = "mse"
+
+                )
 
 
-    output = GP_model.predict(X_val)
+    output = pred_model.predict(X_val)
 
-    means = output[:, 0].detach()
-    sigs = output[:, 1].detach()
+    means = output.detach()
 
-    pred_quants = mu_sig_toQuants(mu = means, sig = sigs, quantiles = [Lower_quant, Upper_quant])
 
-    pred_LO = pred_quants[0].cpu().numpy()
-    pred_UP = pred_quants[1].cpu().numpy()
+    
+    pred_LO = means.cpu().numpy()
+    pred_UP = means.cpu().numpy()
 
     plot_xy_specifyBound(
         y_pred = y_pred,
@@ -82,13 +93,17 @@ def CHECK_GPmodel():
         xlims = [0, 15],
 
         ax = ax2,
-        title = "Confidence Band, MC Estimation"
+        title = "Prediction"
+
     )
 
-    plt.savefig("Plots_bundle/CHECK/check_GPmodel.png")
+    plt.savefig("Plots_bundle/CHECK/check_vanillaPred.png")
 
     plt.show(block=True)
 
-if __name__ == "__main__":
 
-    CHECK_GPmodel()
+
+
+
+if __name__ == "__main__":
+    CHECK_Pred()

@@ -62,6 +62,7 @@ def CHECK_kernelEsti():
         title = "Confidence Band, Kernel Prediction"
     )
 
+    plt.savefig("Plots_bundle/CHECK/check_kernelEstimator.png")
 
     plt.show(block=True)
 

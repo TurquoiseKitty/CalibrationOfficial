@@ -56,11 +56,164 @@ class raw_net(nn.Module):
     ):
         raise NotImplementedError
     
-    def train(
-            self, **kwargs
-    ):
-        raise NotImplementedError
+            
+    def train(self,
+              X_train, Y_train, X_val, Y_val,
+              bat_size = 128,
+              LR = 1E-2,
+              Decay = 1E-4,
+              N_Epoch = 300,
+              validate_times = 20,
+              verbose = True,
+              train_loss = mean_std_norm_loss,
+              val_loss_criterias = {
+                  "nll" : mean_std_norm_loss,
+                  "rmse": rmse_loss
+              },
+              early_stopping = True,
+              patience = 10,
+              monitor_name = "nll",
+              backdoor = None
+            ):
+        
+        optimizer = optim.Adam(self.parameters(), lr = LR, weight_decay=Decay)
+
+
+        if isinstance(X_train, np.ndarray):
+
+            X_train, Y_train, X_val, Y_val = map(torch.Tensor, [X_train, Y_train, X_val, Y_val])
+        
+
+        training_set = TensorDataset(X_train, Y_train)
+
+        if backdoor and backdoor == "MMD_LocalTrain":
+            training_loader = DataLoader(training_set, batch_size=bat_size, shuffle=False)
+        else:
+            training_loader = DataLoader(training_set, batch_size=bat_size, shuffle=True)
+
+        PREV_loss = 1E5
+
+        if early_stopping:
+            patience_count = 0
+
+        for epoch in range(N_Epoch):
+            for i_bat, (X_bat, Y_bat) in enumerate(training_loader):
+
+                optimizer.zero_grad()
+
+                loss = train_loss(self.forward(X_bat), Y_bat)
+
+                loss.backward()
+
+                optimizer.step()
+
+
+            # we always want to validate
+
+            val_output = self.predict(X_val)
+
+            if early_stopping:
+                patience_val_loss = val_loss_criterias[monitor_name](val_output, Y_val).item()
+                if patience_val_loss > PREV_loss:
+                    patience_count += 1
+                
+                PREV_loss = patience_val_loss
+
+            
+            if early_stopping and patience_count >= patience:
+
+                print("Early Stopped at Epoch ", epoch)
+                break
+
+            if epoch % int(N_Epoch / validate_times) == 0 and verbose:
+
+                
+
+                print("epoch ", epoch)
+                for name in val_loss_criterias.keys():
+
+                    val_loss = val_loss_criterias[name](val_output, Y_val).item()
+
+
+                    print("     loss: {0}, {1}".format(name, val_loss))
+
+
+
+class vanilla_predNet(raw_net):
+
+    def __init__(
+            self,
+            n_input,
+            hidden_layers,
+            n_output = 1,
+            device = torch.device('cuda')
+    ): 
+
+        assert n_output == 1
+
+        super(vanilla_predNet, self).__init__(
+            n_input= n_input,
+            hidden_layers= hidden_layers,
+            drop_rate= 0,
+            device= device
+        )
+
+        self.n_output = n_output
+
+        if len(hidden_layers) > 0:
+
+            dim_before = hidden_layers[-1]
+        else:
+            dim_before = n_input
+
+        self.tail = nn.Linear(dim_before, n_output).to(self.device)
+
+
+    def forward(self, x: torch.Tensor):
+
+        assert isinstance(x, torch.Tensor)
+        assert len(x.shape) == 2
+
+        x = x.to(self.device)
+
+        for m in self.raw_model:
+
+            x = m(x)
+
+        x = self.tail(x)
+
+        return x
     
+
+    def predict(self, 
+                x: torch.Tensor,
+                bat_size = 128,
+                trial = 100):
+        
+        assert isinstance(x, torch.Tensor)
+        assert len(x.shape) == 2
+
+        # sometimes validate set might get too big
+
+        val_set = TensorDataset(x)
+        val_loader = DataLoader(val_set, batch_size=bat_size, shuffle=False)
+
+        with torch.no_grad():
+            mus = []
+
+            for x_batch in val_loader:
+
+
+                x = x_batch[0].to(self.device)
+
+                out = self(x)                
+
+                mus.append(out[:,0])
+
+
+        return torch.cat(mus, dim=-1)
+
+
 
 class MC_dropnet(raw_net):
 
@@ -171,87 +324,87 @@ class MC_dropnet(raw_net):
         return  torch.stack((torch.cat(mus, dim=-1), torch.cat(sigs, dim=-1)), dim = 1)
 
 
+class Deep_Ensemble(raw_net):
+
+    def __init__(
+            self,
+            n_input,
+            hidden_layers,
+            n_output = 2,
+            n_models = 5,
+            device = torch.device('cuda')
+    ):
+        
+        assert n_output == 2
+
+
+        super(Deep_Ensemble, self).__init__(
+            n_input= 2,
+            hidden_layers= hidden_layers,
+            drop_rate= 0,
+            device= device
+        )
+        
+        ensembles_list = []
+        self.n_models = n_models
+        self.device = device
+
+        for i in range(n_models):
+
+            ensembles_list.append(
+                MC_dropnet(
+                n_input= n_input,
+                hidden_layers= hidden_layers,
+                n_output= n_output,
+                drop_rate= 0.,
+                device= device
+                )
+            )
+        
+        self.ensembles = nn.ModuleList(ensembles_list)
+
+    def forward(self, x: torch.Tensor):
+
+        assert isinstance(x, torch.Tensor)
+        assert len(x.shape) == 2
+
+        x = x.to(self.device)
+
+        fin_output = []
+
+        for mc_model in self.ensembles:
+
+            out = mc_model(x)
+
+            fin_output.append(out)
 
         
+        return torch.cat(fin_output, dim= 0)
+
+
+    def predict(self, x: torch.Tensor):
         
-        
-    def train(self,
-              X_train, Y_train, X_val, Y_val,
-              bat_size = 128,
-              LR = 1E-2,
-              Decay = 1E-4,
-              N_Epoch = 300,
-              validate_times = 20,
-              verbose = True,
-              train_loss = mean_std_norm_loss,
-              val_loss_criterias = {
-                  "nll" : mean_std_norm_loss,
-                  "rmse": rmse_loss
-              },
-              early_stopping = True,
-              patience = 10,
-              monitor_name = "nll"
-            ):
-        
-        optimizer = optim.Adam(self.parameters(), lr = LR, weight_decay=Decay)
+        raw_out = self(x)
 
 
-        if isinstance(X_train, np.ndarray):
+        assert raw_out.shape == (self.n_models * len(x), 2)
 
-            X_train, Y_train, X_val, Y_val = map(torch.Tensor, [X_train, Y_train, X_val, Y_val])
-        
+        splitted = torch.stack(torch.split(raw_out, len(x)), dim = 0)
 
-        training_set = TensorDataset(X_train, Y_train)
-        training_loader = DataLoader(training_set, batch_size=bat_size, shuffle=True)
+        samples = splitted[:, :, 0]
+        noises = splitted[:, :, 1]
 
-        PREV_loss = 1E5
+        mean_preds = samples.mean(dim = 0)
+        aleatoric = (noises**2).mean(dim = 0)**0.5
 
-        if early_stopping:
-            patience_count = 0
-
-        for epoch in range(N_Epoch):
-            for i_bat, (X_bat, Y_bat) in enumerate(training_loader):
-
-                optimizer.zero_grad()
-
-                loss = train_loss(self.forward(X_bat), Y_bat)
-
-                loss.backward()
-
-                optimizer.step()
+        return torch.stack((mean_preds, aleatoric), dim = 1)
 
 
-            # we always want to validate
-
-            val_output = self.predict(X_val)
-
-            if early_stopping:
-                patience_val_loss = val_loss_criterias[monitor_name](val_output, Y_val).item()
-                if patience_val_loss > PREV_loss:
-                    patience_count += 1
-                
-                PREV_loss = patience_val_loss
-
-            
-            if early_stopping and patience_count >= patience:
-
-                print("Early Stopped at Epoch ", epoch)
-                break
-
-            if epoch % int(N_Epoch / validate_times) == 0 and verbose:
-
-                
-
-                print("epoch ", epoch)
-                for name in val_loss_criterias.keys():
-
-                    val_loss = val_loss_criterias[name](val_output, Y_val).item()
 
 
-                    print("     loss: {0}, {1}".format(name, val_loss))
 
 
-        
+      
 
     
         

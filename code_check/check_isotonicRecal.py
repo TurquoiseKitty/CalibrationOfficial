@@ -58,6 +58,8 @@ def CHECK_isotonicRecal():
 
     fig.tight_layout(pad=2.0)
 
+    plt.savefig("Plots_bundle/CHECK/check_isotonicRecal.png")
+
     plt.show(block=True)
 
 

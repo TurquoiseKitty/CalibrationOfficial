@@ -29,6 +29,7 @@ def CHECK_obs_exp():
         ax = ax
     )
 
+    plt.savefig("Plots_bundle/CHECK/check_evaluationOBEXP.png")
 
     plt.show(block=True)
 

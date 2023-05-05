@@ -61,6 +61,7 @@ def linear_bandPlot():
         title = "Confidence Band, sigma = 2"
     )
 
+    plt.savefig("Plots_bundle/CHECK/check_bandPlot.png")
 
     plt.show(block=True)
 

@@ -1,3 +1,6 @@
+# the effect of using MMD loss alone, in this check we open a backdoor for MMD training, requiring that shuffle is disabled during training. This helps learning local conditional distribution. In high dimension this localization idea is no longer realizable.
+
+
 from src.plot_utils import plot_xy_specifyBound
 import numpy as np
 from scipy import stats
@@ -6,23 +9,24 @@ import matplotlib.pyplot as plt
 from src.models import MC_dropnet
 import torch
 from src.evaluations import mu_sig_toQuants
+from src.losses import MMD_Loss, rmse_loss, gaussian_kernel_func
 
 
-def CHECK_MCdrop():
+def CHECK_MMDLoss():
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
 
-    X_train = np.linspace(0,15,4000)
-    Y_train = DEFAULT_mean_func(X_train) + 1*np.random.randn(4000)
+    X_train = np.linspace(0,15,10000)
+    Y_train = 3*np.sin(X_train/5) + 4*np.sin(X_train/5)*np.random.randn(10000)
 
     X_val = np.linspace(0, 15, 1000)
-    Y_val = DEFAULT_mean_func(X_val) + 1*np.random.randn(1000)
+    Y_val = 3*np.sin(X_val/5) + 4*np.sin(X_val/5)*np.random.randn(1000)
 
-    y_pred = DEFAULT_mean_func(X_val)
+    y_pred = 3*np.sin(X_val/5)
 
-    y_UP1 = y_pred + 1 * normalZ.ppf(Upper_quant)
-    y_LO1 = y_pred + 1 * normalZ.ppf(Lower_quant)
+    y_UP1 = y_pred + 4*np.sin(X_val/5) * normalZ.ppf(Upper_quant)
+    y_LO1 = y_pred + 4*np.sin(X_val/5) * normalZ.ppf(Lower_quant)
 
 
     X_train = torch.Tensor(X_train).view(-1, 1).cuda()
@@ -31,21 +35,30 @@ def CHECK_MCdrop():
     Y_train = torch.Tensor(Y_train).cuda()
     Y_val = torch.Tensor(Y_val).cuda()
 
-    MC_model = MC_dropnet(
+    MMD_model = MC_dropnet(
         n_input = 1,
-        drop_rate= 0.1,
+        drop_rate= 0.,
         hidden_layers= [10, 10]
     )
 
-    MC_model.train(X_train, Y_train, X_val, Y_val,
-                bat_size = 10,
+    MMD_model.train(X_train, Y_train, X_val, Y_val,
+                bat_size = 50,
                 LR = 5E-3,
-                N_Epoch = 100,
+                N_Epoch = 200,
                 early_stopping=True,
-                patience= 20)
+                patience= 30,
+                train_loss = MMD_Loss,
+                val_loss_criterias = {
+                    "MMD" : MMD_Loss,
+                    "rmse": rmse_loss
+                },
+                monitor_name = "MMD",
+                backdoor= "MMD_LocalTrain"
+
+                )
 
 
-    output = MC_model.predict(X_val)
+    output = MMD_model.predict(X_val)
 
     means = output[:, 0].detach()
     sigs = output[:, 1].detach()
@@ -86,11 +99,11 @@ def CHECK_MCdrop():
         xlims = [0, 15],
 
         ax = ax2,
-        title = "Confidence Band, MC Estimation"
+        title = "Confidence Band, MMD Loss"
 
     )
 
-    plt.savefig("Plots_bundle/CHECK/check_MCdrop.png")
+    plt.savefig("Plots_bundle/CHECK/check_MMDlocal.png")
 
     plt.show(block=True)
 
@@ -99,4 +112,4 @@ def CHECK_MCdrop():
 
 
 if __name__ == "__main__":
-    CHECK_MCdrop()
+    CHECK_MMDLoss()
