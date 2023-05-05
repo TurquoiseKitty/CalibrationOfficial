@@ -117,33 +117,63 @@ class MC_dropnet(raw_net):
 
     def predict(self, 
                 x: torch.Tensor,
+                bat_size = 128,
                 trial = 100):
         
-        if self.drop_rate > 1E-4:
-            samples = []
-            noises = []
+        assert isinstance(x, torch.Tensor)
+        assert len(x.shape) == 2
 
-            for i in range(trial):
-                preds = self(x)
-                samples.append(preds[:, 0])
-                noises.append(preds[:, 1])
+        # sometimes validate set might get too big
 
-            samples = torch.stack(samples, dim = 0)
-            noises = torch.stack(noises, dim = 0)
-            assert samples.shape == (trial, len(x))
+        val_set = TensorDataset(x)
+        val_loader = DataLoader(val_set, batch_size=bat_size, shuffle=False)
 
-            mean_preds = samples.mean(dim = 0)
-            aleatoric = (noises**2).mean(dim = 0)**0.5
+        with torch.no_grad():
+            mus = []
+            sigs = []
 
-            epistemic = samples.var(dim = 0)**0.5
-            total_unc = (aleatoric**2 + epistemic**2)**0.5
-
-            return torch.stack((mean_preds, aleatoric), dim = 1)
+            for x_batch in val_loader:
 
 
+                x = x_batch[0].to(self.device)
 
-        else:
-            return self(x)
+                if self.drop_rate > 1E-4:
+                    samples = []
+                    noises = []
+
+                    for i in range(trial):
+                        preds = self(x)
+                        samples.append(preds[:, 0])
+                        noises.append(preds[:, 1])
+
+                    samples = torch.stack(samples, dim = 0)
+                    noises = torch.stack(noises, dim = 0)
+                    assert samples.shape == (trial, len(x))
+
+                    mean_preds = samples.mean(dim = 0)
+                    aleatoric = (noises**2).mean(dim = 0)**0.5
+
+                    epistemic = samples.var(dim = 0)**0.5
+                    total_unc = (aleatoric**2 + epistemic**2)**0.5
+
+                    out = torch.stack((mean_preds, aleatoric), dim = 1)
+
+
+
+                else:
+                    out = self(x)
+
+                
+
+                mus.append(out[:,0])
+                sigs.append(out[:,1])
+
+        return  torch.stack((torch.cat(mus, dim=-1), torch.cat(sigs, dim=-1)), dim = 1)
+
+
+
+        
+        
         
     def train(self,
               X_train, Y_train, X_val, Y_val,
@@ -170,8 +200,6 @@ class MC_dropnet(raw_net):
 
             X_train, Y_train, X_val, Y_val = map(torch.Tensor, [X_train, Y_train, X_val, Y_val])
         
-        X_train, Y_train, X_val, Y_val = X_train.to(self.device), Y_train.to(self.device), X_val.to(self.device), Y_val.to(self.device)
-
 
         training_set = TensorDataset(X_train, Y_train)
         training_loader = DataLoader(training_set, batch_size=bat_size, shuffle=True)
