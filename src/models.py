@@ -149,8 +149,6 @@ class vanilla_predNet(raw_net):
             device = torch.device('cuda')
     ): 
 
-        assert n_output == 1
-
         super(vanilla_predNet, self).__init__(
             n_input= n_input,
             hidden_layers= hidden_layers,
@@ -188,7 +186,7 @@ class vanilla_predNet(raw_net):
     def predict(self, 
                 x: torch.Tensor,
                 bat_size = 128,
-                trial = 100):
+                ):
         
         assert isinstance(x, torch.Tensor)
         assert len(x.shape) == 2
@@ -212,6 +210,58 @@ class vanilla_predNet(raw_net):
 
 
         return torch.cat(mus, dim=-1)
+
+
+class quantile_predNet(vanilla_predNet):
+
+    
+    def __init__(
+            self,
+            n_input,
+            hidden_layers,
+            n_output,
+            device = torch.device('cuda')
+    ): 
+
+        super(quantile_predNet, self).__init__(
+            n_input= n_input,
+            hidden_layers= hidden_layers,
+            n_output= n_output,
+            device= device
+        )
+
+
+    def predict(self, 
+                x: torch.Tensor,
+                bat_size = 128,
+                ):
+        
+        assert isinstance(x, torch.Tensor)
+        assert len(x.shape) == 2
+
+        # sometimes validate set might get too big
+
+        val_set = TensorDataset(x)
+        val_loader = DataLoader(val_set, batch_size=bat_size, shuffle=False)
+
+        with torch.no_grad():
+            outs = []
+
+            for x_batch in val_loader:
+
+
+                x = x_batch[0].to(self.device)
+
+                out = self(x)                
+
+                outs.append(out)
+
+
+        return torch.cat(outs, dim=0)
+
+
+
+
 
 
 
