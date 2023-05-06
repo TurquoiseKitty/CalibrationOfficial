@@ -47,7 +47,38 @@ def kernel_estimator(
 
     tf_mat = quantiles_unsquze <= quants
 
-    harvest_ids = len(recal_Z) - torch.permute(tf_mat.sum(dim=1), (1, 0))
+    harvest_ids = torch.clip(len(recal_Z) - torch.permute(tf_mat.sum(dim=1), (1, 0)), max = len(recal_Z)-1)
 
-    return sorted_epsi[harvest_ids]
+    return sorted_epsi[harvest_ids]             # shape (len(quants), len(test_Z))
 
+
+
+# algorithm 2 for MAQR proposed in Beyond Pinball Loss: Quantile Methods for Calibrated Uncertainty Quantification
+
+def tau_to_quant_datasetCreate(
+        Z: torch.Tensor,
+        epsilon: torch.Tensor,
+        quants,
+        kernel = lambda X : (norm(X, dim = 2) <= 1).type(torch.float),
+        wid = 1E-1
+):
+    tauXsample = kernel_estimator(
+        test_Z = Z,
+        recal_Z = Z,
+        recal_epsilon = epsilon,
+        quants = quants,
+        base_kernel = kernel,
+        lamb = 1,
+        wid = wid
+        )
+    sample_bed = tauXsample.reshape(-1)
+    quant_bed = torch.Tensor(quants).view(-1, 1).repeat(1, len(Z)).view(-1).to(Z.device)
+
+
+    x_stacked = Z.repeat(len(quants), 1)
+    
+    train_X = torch.cat([x_stacked, quant_bed.view(-1,1)], dim=1)
+
+    train_Y = sample_bed
+
+    return train_X, train_Y

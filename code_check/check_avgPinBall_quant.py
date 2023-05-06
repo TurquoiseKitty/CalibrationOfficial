@@ -1,5 +1,3 @@
-# This experiment is a mistake, as avgpinball loss can not be used for training the heteroskedastic model
-
 from src.plot_utils import plot_xy_specifyBound
 import numpy as np
 from scipy import stats
