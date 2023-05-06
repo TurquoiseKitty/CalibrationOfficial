@@ -1,5 +1,3 @@
-# This experiment is a mistake, as avgpinball loss can not be used for training the heteroskedastic model
-
 from src.plot_utils import plot_xy_specifyBound
 import numpy as np
 from scipy import stats
@@ -18,8 +16,8 @@ def CHECK_avgPinBall():
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
 
-    X_train = np.linspace(0,15,4000)
-    Y_train = mu_func(X_train) + sigma_func(X_train)*np.random.randn(4000)
+    X_train = np.linspace(0,15,10000)
+    Y_train = mu_func(X_train) + sigma_func(X_train)*np.random.randn(10000)
 
     X_val = np.linspace(0, 15, 1000)
     Y_val = mu_func(X_val) + sigma_func(X_val)*np.random.randn(1000)
@@ -39,7 +37,7 @@ def CHECK_avgPinBall():
     PinBall_model = MC_dropnet(
         n_input = 1,
         drop_rate= 0.,
-        hidden_layers= [10]
+        hidden_layers= [10, 10]
     )
 
     PinBall_model.train(X_train, Y_train, X_val, Y_val,
@@ -53,7 +51,6 @@ def CHECK_avgPinBall():
                     "rmse": rmse_loss
                 },
                 monitor_name = "pinball",
-                backdoor= "MMD_LocalTrain"  # if we don't open this backdoor then the mean prediction will be a horizontal line
                 )
 
 

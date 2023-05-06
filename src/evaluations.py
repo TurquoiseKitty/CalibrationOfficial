@@ -33,10 +33,8 @@ def mu_sig_toQuants(
     sig: torch.Tensor,
     quantiles,
 ):
-    assert isinstance(mu, torch.Tensor)
-    assert len(mu.shape) == 1
-    assert len(sig.shape) == 1
-    quants = torch.Tensor(np.clip(normalZ.ppf(quantiles), a_min = -1E5, a_max= 1E5)).view(-1, 1).to(mu.device)
+    
+    quants = torch.Tensor(np.clip(normalZ.ppf(quantiles), a_min = -5, a_max= 5)).view(-1, 1).to(mu.device)
 
     quant_ests = quants * sig + mu.view(1, -1).repeat(len(quantiles), 1)
 

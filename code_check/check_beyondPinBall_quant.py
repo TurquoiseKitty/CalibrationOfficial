@@ -8,12 +8,12 @@ import matplotlib.pyplot as plt
 from src.models import MC_dropnet, quantile_predNet
 import torch
 from src.evaluations import mu_sig_toQuants
-from src.losses import MMD_Loss, rmse_loss, avg_pinball_quantile
+from src.losses import MMD_Loss, rmse_loss, BeyondPinball_quantile
 
 mu_func = lambda x : 3*np.sin(x/5)
 sigma_func = lambda x : 4*np.sin(x/5)
 
-def CHECK_avgPinBall():
+def CHECK_BeyondPinBall():
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
@@ -36,29 +36,29 @@ def CHECK_avgPinBall():
     Y_train = torch.Tensor(Y_train).cuda()
     Y_val = torch.Tensor(Y_val).cuda()
 
-    PinBall_model = quantile_predNet(
+    BeyondPinBall_model = quantile_predNet(
         n_input = 1,
         
         hidden_layers= [10, 10],
         n_output= 3
     )
 
-    PinBall_model.train(X_train, Y_train, X_val, Y_val,
-                bat_size = 20,
+    BeyondPinBall_model.train(X_train, Y_train, X_val, Y_val,
+                bat_size = 200,
                 LR = 5E-3,
                 N_Epoch = 100,
                 early_stopping=False,
-                train_loss = lambda x, y: avg_pinball_quantile(x, y, q_list= [Lower_quant, 0.5, Upper_quant]),
+                train_loss = lambda x, y: BeyondPinball_quantile(x, y, q_list= [Lower_quant, 0.5, Upper_quant]),
                 val_loss_criterias = {
-                    "pinball" : lambda x, y: avg_pinball_quantile(x, y, q_list= [Lower_quant, 0.5, Upper_quant]),
+                    "beyond_pinball" : lambda x, y: BeyondPinball_quantile(x, y, q_list= [Lower_quant, 0.5, Upper_quant]),
                     "rmse": lambda x, y: rmse_loss(x[:,1], y)
                 },
-                monitor_name = "pinball",
+                monitor_name = "beyond_pinball",
 
                 )
 
 
-    output = PinBall_model.predict(X_val)
+    output = BeyondPinBall_model.predict(X_val)
 
     means = output[:, 1].detach()
     
@@ -97,11 +97,11 @@ def CHECK_avgPinBall():
         xlims = [0, 15],
 
         ax = ax2,
-        title = "Confidence Band, PinBall Loss"
+        title = "Confidence Band, BeyondPinBall Loss"
 
     )
 
-    plt.savefig("Plots_bundle/CHECK/check_avgPinBall_quant.png")
+    plt.savefig("Plots_bundle/CHECK/check_beyondPinBall_quant.png")
 
     plt.show(block=True)
 
@@ -110,4 +110,4 @@ def CHECK_avgPinBall():
 
 
 if __name__ == "__main__":
-    CHECK_avgPinBall()
+    CHECK_BeyondPinBall()

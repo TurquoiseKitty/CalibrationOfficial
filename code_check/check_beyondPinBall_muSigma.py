@@ -1,19 +1,17 @@
-# This experiment is a mistake, as avgpinball loss can not be used for training the heteroskedastic model
-
 from src.plot_utils import plot_xy_specifyBound
 import numpy as np
 from scipy import stats
 from src.DEFAULTS import normalZ, Upper_quant, Lower_quant, DEFAULT_mean_func, DEFAULT_layers
 import matplotlib.pyplot as plt
-from src.models import MC_dropnet, quantile_predNet
+from src.models import MC_dropnet
 import torch
 from src.evaluations import mu_sig_toQuants
-from src.losses import MMD_Loss, rmse_loss, avg_pinball_quantile
+from src.losses import MMD_Loss, rmse_loss, BeyondPinball_muSigma
 
 mu_func = lambda x : 3*np.sin(x/5)
 sigma_func = lambda x : 4*np.sin(x/5)
 
-def CHECK_avgPinBall():
+def CHECK_BeyondPinBall_muSigma():
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
@@ -36,35 +34,35 @@ def CHECK_avgPinBall():
     Y_train = torch.Tensor(Y_train).cuda()
     Y_val = torch.Tensor(Y_val).cuda()
 
-    PinBall_model = quantile_predNet(
+    BeyondPinBall_model = MC_dropnet(
         n_input = 1,
-        
-        hidden_layers= [10, 10],
-        n_output= 3
+        drop_rate= 0.,
+        hidden_layers= [10, 10]
     )
 
-    PinBall_model.train(X_train, Y_train, X_val, Y_val,
-                bat_size = 20,
+    BeyondPinBall_model.train(X_train, Y_train, X_val, Y_val,
+                bat_size = 100,
                 LR = 5E-3,
                 N_Epoch = 100,
                 early_stopping=False,
-                train_loss = lambda x, y: avg_pinball_quantile(x, y, q_list= [Lower_quant, 0.5, Upper_quant]),
+                train_loss= BeyondPinball_muSigma,
                 val_loss_criterias = {
-                    "pinball" : lambda x, y: avg_pinball_quantile(x, y, q_list= [Lower_quant, 0.5, Upper_quant]),
-                    "rmse": lambda x, y: rmse_loss(x[:,1], y)
+                    "beyond_pinball" : BeyondPinball_muSigma,
+                    "rmse": rmse_loss
                 },
-                monitor_name = "pinball",
-
+                monitor_name = "beyond_pinball",
                 )
 
 
-    output = PinBall_model.predict(X_val)
+    output = BeyondPinBall_model.predict(X_val)
 
-    means = output[:, 1].detach()
-    
+    means = output[:, 0].detach()
+    sigs = output[:, 1].detach()
 
-    pred_LO = output[:, 0].cpu().numpy()
-    pred_UP = output[:, 2].cpu().numpy()
+    pred_quants = mu_sig_toQuants(mu = means, sig = sigs, quantiles = [Lower_quant, Upper_quant])
+
+    pred_LO = pred_quants[0].cpu().numpy()
+    pred_UP = pred_quants[1].cpu().numpy()
 
     plot_xy_specifyBound(
         y_pred = y_pred,
@@ -97,11 +95,11 @@ def CHECK_avgPinBall():
         xlims = [0, 15],
 
         ax = ax2,
-        title = "Confidence Band, PinBall Loss"
+        title = "Confidence Band, BeyondPinBall Loss"
 
     )
 
-    plt.savefig("Plots_bundle/CHECK/check_avgPinBall_quant.png")
+    plt.savefig("Plots_bundle/CHECK/check_beyondPinBall_muSigma.png")
 
     plt.show(block=True)
 
@@ -110,4 +108,4 @@ def CHECK_avgPinBall():
 
 
 if __name__ == "__main__":
-    CHECK_avgPinBall()
+    CHECK_BeyondPinBall_muSigma()
