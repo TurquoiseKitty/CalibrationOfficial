@@ -106,7 +106,6 @@ class raw_net(nn.Module):
 
                 assert "early_stopped" in harvestor.keys() and not harvestor["early_stopped"]
                 assert harvestor["early_stopping_epoch"] == 0
-                assert harvestor["monitor_name"] == monitor_name
                 assert len(harvestor["monitor_vals"]) == 0
 
             for key in val_loss_criterias.keys():

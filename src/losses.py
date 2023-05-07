@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch
 import numpy as np
 from .DEFAULTS import normalZ
+from .evaluations import obs_vs_exp, mu_sig_toQuants
 
 def mse_loss(predic, target):
 
@@ -263,5 +264,31 @@ def BeyondPinball_muSigma(y_out, Y, q_list = np.linspace(0,1,100)):
 
 
 
+
+def MACE_Loss(
+    y_out,
+    Y,
+    q_list = np.linspace(0, 1, 100),
+):
+
+    assert y_out.shape == (len(q_list), len(Y))
+
+    exp_quants, obs_quants = obs_vs_exp(Y, q_list, y_out)
+
+    abs_diff_proportions = torch.abs(exp_quants - obs_quants)
+    mace = torch.mean(abs_diff_proportions)
+
+    return mace
+
+def MACE_muSigma(
+    y_out, Y, q_list = np.linspace(0,1,100)
+):
+    assert len(y_out) == len(Y)
+
+    assert y_out.shape == (len(y_out), 2)
+
+    y_quants = mu_sig_toQuants(y_out[:,0], y_out[:, 1], quantiles = q_list)
+
+    return MACE_Loss(y_quants, Y, q_list)
 
 

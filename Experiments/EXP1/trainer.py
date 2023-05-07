@@ -1,7 +1,7 @@
 from data_utils import seed_all, splitter, common_processor_UCI, get_uci_data
 import os
 from src.models import vanilla_predNet, MC_dropnet, Deep_Ensemble
-from src.losses import mse_loss, rmse_loss, mean_std_norm_loss, mean_std_forEnsemble, BeyondPinball_muSigma
+from src.losses import mse_loss, rmse_loss, mean_std_norm_loss, mean_std_forEnsemble, BeyondPinball_muSigma, MMD_Loss, MACE_Loss, MACE_muSigma
 import torch
 from src.GPmodels import oneLayer_DeepGP
 import time
@@ -19,6 +19,10 @@ model_callByName = {
     "DeepEnsemble": Deep_Ensemble,
     "HNN_BeyondPinball": MC_dropnet,
     "vanillaPred": vanilla_predNet,
+
+    "HNN_MMD": MC_dropnet,
+    "vanillaMSQR": vanilla_predNet,
+    "vanillaKernel": vanilla_predNet
 }
 
 loss_callByName = {
@@ -26,7 +30,10 @@ loss_callByName = {
     "rmse_loss": rmse_loss, 
     "mean_std_norm_loss": mean_std_norm_loss, 
     "mean_std_forEnsemble": mean_std_forEnsemble, 
-    "BeyondPinball_muSigma": BeyondPinball_muSigma
+    "BeyondPinball_muSigma": BeyondPinball_muSigma,
+    "MMD_Loss": MMD_Loss,
+    "MACE_Loss": MACE_Loss,
+    "MACE_muSigma": MACE_muSigma
 }
 
 
@@ -162,6 +169,7 @@ def grid_searcher(
     start_time = time.time()
     
     summarizer = []
+    support_summ = {}
 
     assert model_name in model_callByName.keys()
 
@@ -170,6 +178,7 @@ def grid_searcher(
         SEED = starting_seed + k
 
         sub_summarizer = {}
+        aid_summarizer = {}
 
         seed_all(SEED)
 
@@ -204,14 +213,16 @@ def grid_searcher(
             training_config["train_loss"] = "mean_std_norm_loss"
             training_config["val_loss_criterias"] = {
                 "nll": "mean_std_norm_loss",
-                "rmse": "rmse_loss"
+                "rmse": "rmse_loss",
+                "MACE": "MACE_muSigma"
             }
             
             training_config["monitor_name"] = "nll"
 
-            harvestor["monitor_name"] = "nll"
+            harvestor["monitor_name"] = "MACE"
             harvestor["val_nll"] = []
             harvestor["val_rmse"] = []
+            harvestor["val_MACE"] = []
     
         elif model_name == "MC_drop":
 
@@ -222,14 +233,16 @@ def grid_searcher(
             training_config["train_loss"] = "mean_std_norm_loss"
             training_config["val_loss_criterias"] = {
                 "nll": "mean_std_norm_loss",
-                "rmse": "rmse_loss"
+                "rmse": "rmse_loss",
+                "MACE": "MACE_muSigma"
             }
             
             training_config["monitor_name"] = "nll"
 
-            harvestor["monitor_name"] = "nll"
+            harvestor["monitor_name"] = "MACE"
             harvestor["val_nll"] = []
             harvestor["val_rmse"] = []
+            harvestor["val_MACE"] = []
 
         elif model_name == "DeepEnsemble": 
             
@@ -240,29 +253,34 @@ def grid_searcher(
             training_config["train_loss"] = "mean_std_forEnsemble"
             training_config["val_loss_criterias"] = {
                 "nll": "mean_std_forEnsemble",
-                "rmse": "rmse_loss"
+                "rmse": "rmse_loss",
+                "MACE": "MACE_muSigma"
             }
             
             training_config["monitor_name"] = "nll"
 
-            harvestor["monitor_name"] = "nll"
+            harvestor["monitor_name"] = "MACE"
             harvestor["val_nll"] = []
             harvestor["val_rmse"] = []
+            harvestor["val_MACE"] = []
 
         elif model_name == "GPmodel": 
 
             training_config["train_loss"] = "mean_std_norm_loss"
             training_config["val_loss_criterias"] = {
                 "nll": "mean_std_norm_loss",
-                "rmse": "rmse_loss"
+                "rmse": "rmse_loss",
+                "MACE": "MACE_muSigma"
             }
             training_config["num_samples"] = 10
             
             training_config["monitor_name"] = "nll"
 
-            harvestor["monitor_name"] = "nll"
+            harvestor["monitor_name"] = "MACE"
             harvestor["val_nll"] = []
             harvestor["val_rmse"] = []
+            harvestor["val_MACE"] = []
+
 
         elif model_name == "HNN_BeyondPinball": 
 
@@ -274,14 +292,16 @@ def grid_searcher(
             training_config["train_loss"] = "BeyondPinball_muSigma"
             training_config["val_loss_criterias"] = {
                 "beyondPinBall": "BeyondPinball_muSigma",
-                "rmse": "rmse_loss"
+                "rmse": "rmse_loss",
+                "MACE": "MACE_muSigma"
             }
             
             training_config["monitor_name"] = "beyondPinBall"
 
-            harvestor["monitor_name"] = "beyondPinBall"
+            harvestor["monitor_name"] = "MACE"
             harvestor["val_beyondPinBall"] = []
             harvestor["val_rmse"] = []
+            harvestor["val_MACE"] = []
 
         elif model_name == "vanillaPred":
             
@@ -325,11 +345,19 @@ def grid_searcher(
 
                 # now the summarizer is grepping informations from the harvestor
                 sub_summarizer[(LR, bat_size)] = np.mean(harvestor["monitor_vals"][-3:])
+                aid_summarizer[(LR, bat_size)] = {}
+                
+                for key in training_config["val_loss_criterias"].keys():
+                    aid_summarizer[(LR, bat_size)]["val_"+key] = np.mean(harvestor["val_"+key][-3:])
 
 
-        summarizer.append(min(sub_summarizer.items(), key=operator.itemgetter(1))[0])
+        para_got = min(sub_summarizer.items(), key=operator.itemgetter(1))[0]
+        summarizer.append(para_got)
+        support_summ[para_got] = aid_summarizer[para_got]
         
     choice_para = max(set(summarizer), key = summarizer.count)
+
+    aid_dic = support_summ[choice_para]
 
     choice_LR, choice_bat_size = choice_para
 
@@ -362,6 +390,9 @@ def grid_searcher(
     for tup in summarizer:
         handle.write("\t ({0}, {1})\n".format(tup[0], tup[1]))
     handle.write("we finally choose ({0}, {1}) as the best hyperparameters\n".format(choice_LR, choice_bat_size))
+    handle.write("with corresponding evaluations:\n")
+    for key in aid_dic.keys():
+        handle.write("\t"+key+": "+str(aid_dic[key])+"\n")
     handle.write("All configs are recorded into yaml files in the config directory\n")
     handle.write("\n\n")
     handle.write("# -------------------------------------------------")
@@ -496,16 +527,16 @@ if __name__ == "__main__":
 
 if __name__ == "__main__":
 
-    for key in model_callByName.keys():
+    for key in ["GPmodel", "HNN", "MC_drop", "DeepEnsemble", "HNN_BeyondPinball", "vanillaPred"]:
 
         print("model: ", key)
         grid_searcher(
-            dataset_name = "wine",
+            dataset_name = "energy",
             num_repeat = 2,
             model_name = key,
             to_search = {
                 "LR": [1E-2, 5E-3],
-                "bat_size": [100, 600]
+                "bat_size": [600]
             }
         )
 
