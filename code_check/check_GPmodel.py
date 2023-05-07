@@ -32,7 +32,7 @@ def CHECK_GPmodel():
     Y_val = torch.Tensor(Y_val).cuda()
 
     GP_model = oneLayer_DeepGP(
-        in_dim = 1, hidden_dim = 12
+        n_input = 1, hidden_layers= [10]
     )
 
 

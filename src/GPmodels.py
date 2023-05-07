@@ -77,7 +77,14 @@ class ToyDeepGPHiddenLayer(DeepGPLayer):
 
 
 class oneLayer_DeepGP(DeepGP):
-    def __init__(self, in_dim, hidden_dim, device = torch.device('cuda')):
+
+    
+
+    def __init__(self, n_input, hidden_layers, device = torch.device('cuda'), **kwargs):
+
+        in_dim = n_input
+        hidden_dim = hidden_layers[0]
+
         hidden_layer = ToyDeepGPHiddenLayer(
             input_dims=in_dim,
             output_dims=hidden_dim,
@@ -150,12 +157,48 @@ class oneLayer_DeepGP(DeepGP):
               },
               early_stopping = True,
               patience = 10,
-              monitor_name = "nll"
+              monitor_name = "nll",
+              harvestor = None
               ):
 
         optimizer = torch.optim.Adam([
             {'params': self.parameters()},
         ], lr=LR, weight_decay=Decay)
+
+
+        if not harvestor:
+
+            harvestor = {
+                "training_losses": []
+            }
+            if early_stopping:
+                harvestor["early_stopped"] = False
+                harvestor["early_stopping_epoch"] = 0
+                harvestor["monitor_name"] = monitor_name
+                harvestor["monitor_vals"] = []
+
+            for key in val_loss_criterias.keys():
+                harvestor["val_"+key] = []
+
+        else:
+
+            # we are assuming that a harvestor is carefully written and carefully inserted
+
+            assert len(harvestor["training_losses"]) == 0
+
+            if early_stopping:
+
+                assert "early_stopped" in harvestor.keys() and not harvestor["early_stopped"]
+                assert harvestor["early_stopping_epoch"] == 0
+                assert harvestor["monitor_name"] == monitor_name
+                assert len(harvestor["monitor_vals"]) == 0
+
+            for key in val_loss_criterias.keys():
+                assert len(harvestor["val_"+key]) == 0
+
+
+
+
 
         if isinstance(X_train, np.ndarray):
 
@@ -185,11 +228,15 @@ class oneLayer_DeepGP(DeepGP):
 
             
             # we always want to validate
+            harvestor["training_losses"].append(loss.item())
 
             val_output = self.predict(X_val)
 
             if early_stopping:
                 patience_val_loss = val_loss_criterias[monitor_name](val_output, Y_val).item()
+                
+                harvestor["monitor_vals"].append(patience_val_loss)
+                
                 if patience_val_loss > PREV_loss:
                     patience_count += 1
                 
@@ -198,19 +245,29 @@ class oneLayer_DeepGP(DeepGP):
             
             if early_stopping and patience_count >= patience:
 
-                print("Early Stopped at Epoch ", epoch)
+                if verbose:
+
+                    print("Early Stopped at Epoch ", epoch)
+
+                harvestor["early_stopped"] = True
+                harvestor["early_stopping_epoch"] = epoch
+
                 break
 
-            if epoch % int(N_Epoch / validate_times) == 0 and verbose:
+            if epoch % int(N_Epoch / validate_times) == 0:
 
                 
+                if verbose:
+                    print("epoch ", epoch)
 
-                print("epoch ", epoch)
                 for name in val_loss_criterias.keys():
 
                     val_loss = val_loss_criterias[name](val_output, Y_val).item()
 
+                    
+                    harvestor["val_"+name].append(val_loss)
 
-                    print("     loss: {0}, {1}".format(name, val_loss))
+                    if verbose:
+                        print("     loss: {0}, {1}".format(name, val_loss))
 
                     

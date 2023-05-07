@@ -164,7 +164,9 @@ class raw_net(nn.Module):
             
             if early_stopping and patience_count >= patience:
 
-                print("Early Stopped at Epoch ", epoch)
+                if verbose:
+
+                    print("Early Stopped at Epoch ", epoch)
                 
                 harvestor["early_stopped"] = True
                 harvestor["early_stopping_epoch"] = epoch
@@ -172,19 +174,19 @@ class raw_net(nn.Module):
 
                 break
 
-            if epoch % int(N_Epoch / validate_times) == 0 and verbose:
+            if epoch % int(N_Epoch / validate_times) == 0:
 
                 
-
-                print("epoch ", epoch)
+                if verbose:
+                    print("epoch ", epoch)
                 for name in val_loss_criterias.keys():
 
                     val_loss = val_loss_criterias[name](val_output, Y_val).item()
 
                     harvestor["val_"+name].append(val_loss)
 
-                    print("     loss: {0}, {1}".format(name, val_loss))
-
+                    if verbose:
+                        print("     loss: {0}, {1}".format(name, val_loss))
 
 
 class vanilla_predNet(raw_net):
@@ -320,7 +322,7 @@ class MC_dropnet(raw_net):
             n_input,
             hidden_layers,
             n_output = 2,
-            drop_rate = 0.5,
+            drop_rate = 0.1,
             device = torch.device('cuda')
     ): 
         
