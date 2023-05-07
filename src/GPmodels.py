@@ -158,7 +158,8 @@ class oneLayer_DeepGP(DeepGP):
               early_stopping = True,
               patience = 10,
               monitor_name = "nll",
-              harvestor = None
+              harvestor = None,
+              **kwargs
               ):
 
         optimizer = torch.optim.Adam([

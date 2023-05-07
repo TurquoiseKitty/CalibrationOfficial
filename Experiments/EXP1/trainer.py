@@ -8,16 +8,25 @@ import time
 import copy
 import numpy as np
 import operator
+import yaml
 
 
 # these are 6 basic models. The rest implements will sort of bases on them
 model_callByName = {
-    "vanillaPred": vanilla_predNet,
     "GPmodel": oneLayer_DeepGP,
     "HNN": MC_dropnet,
     "MC_drop": MC_dropnet,
     "DeepEnsemble": Deep_Ensemble,
     "HNN_BeyondPinball": MC_dropnet,
+    "vanillaPred": vanilla_predNet,
+}
+
+loss_callByName = {
+    "mse_loss": mse_loss, 
+    "rmse_loss": rmse_loss, 
+    "mean_std_norm_loss": mean_std_norm_loss, 
+    "mean_std_forEnsemble": mean_std_forEnsemble, 
+    "BeyondPinball_muSigma": BeyondPinball_muSigma
 }
 
 
@@ -46,12 +55,48 @@ def trainer(     # describs a training process
     
     seed_all(seed)
 
-    assert misc_info["input_x_shape"] == raw_train_X.shape
-    assert misc_info["input_y_shape"] == raw_train_Y.shape
+    misc_info = copy.deepcopy(misc_info)
+    training_config = copy.deepcopy(training_config)
+
+
+    assert misc_info["input_x_shape"] == list(raw_train_X.shape)
+    assert misc_info["input_y_shape"] == list(raw_train_Y.shape)
+
+    
+    # an additional steps to convert the cofigs
+    # ---------------------------------------------------
+
+    assert misc_info["model_config"]["device"] in ['cpu', 'cuda']
+    if misc_info["model_config"]["device"] == 'cpu':
+        misc_info["model_config"]["device"] = torch.device('cpu')
+    elif misc_info["model_config"]["device"] == 'cuda':
+        misc_info["model_config"]["device"] = torch.device('cuda')
+
+    training_config["train_loss"] = loss_callByName[training_config["train_loss"]]
+
+    for key in training_config["val_loss_criterias"].keys():
+        training_config["val_loss_criterias"][key] = loss_callByName[training_config["val_loss_criterias"][key]]
+    
 
     if not model:
 
+        
+        misc_info["model_init"] = model_callByName[misc_info["model_init"]]
+
         model = misc_info["model_init"](**misc_info["model_config"])
+
+    
+
+    
+
+    # ---------------------------------------------------
+
+
+
+
+
+
+
 
     split_percet = misc_info["val_percentage"]
     N_val = int(split_percet*len(raw_train_Y))
@@ -77,12 +122,12 @@ def grid_searcher(
     model_name = "vanillaPred",
     to_search = {
         "LR": [1E-2, 5E-3, 1E-3],
-        "bat_size": [10, 64]
+        "bat_size": [10, 64, 256]
     },
     misc_preconfigs = {
         "val_percentage": 0.1,
         "model_config" :{
-            "device" : torch.device('cuda'),
+            "device" : 'cuda',
             "hidden_layers" : [10, 5]
         },
         "save_path_and_name": None
@@ -109,7 +154,8 @@ def grid_searcher(
         "monitor_vals" : [],
 
     },
-    report_path = os.getcwd()+"/Experiments/EXP1/reports/"
+    report_path = os.getcwd()+"/Experiments/EXP1/record_bin/",
+    config_path = os.getcwd()+"/Experiments/EXP1/config_bin/"
 
 ):
     
@@ -132,8 +178,8 @@ def grid_searcher(
         # now that data is not enough, we just use training set for recalibration
         train_X, test_X, recal_X, train_Y, test_Y, recal_Y = common_processor_UCI(x, y, recal_percent= 0, seed = SEED)
 
-        train_X = torch.Tensor(train_X).cuda()
-        train_Y = torch.Tensor(train_Y).cuda()
+        train_X = torch.Tensor(train_X)
+        train_Y = torch.Tensor(train_Y).to(torch.device(misc_preconfigs["model_config"]["device"]))
 
         # carefully set misc_info, as well as harvestor and training_confiig
         # ---------------------------------------------------------
@@ -141,10 +187,10 @@ def grid_searcher(
         harvestor = copy.deepcopy(harvestor_preconfig)
         training_config = copy.deepcopy(train_preconfig)
 
-        misc_info["input_x_shape"] = train_X.shape
-        misc_info["input_y_shape"] = train_Y.shape
+        misc_info["input_x_shape"] = list(train_X.shape)
+        misc_info["input_y_shape"] = list(train_Y.shape)
 
-        misc_info["model_init"] = model_callByName[model_name]
+        misc_info["model_init"] = model_name
 
         # model config is a little bit tricky
         misc_info["model_config"]["n_input"] = len(train_X[0])
@@ -155,10 +201,10 @@ def grid_searcher(
             misc_info["model_config"]["drop_rate"] = 0.
 
 
-            training_config["train_loss"] = mean_std_norm_loss
+            training_config["train_loss"] = "mean_std_norm_loss"
             training_config["val_loss_criterias"] = {
-                "nll": mean_std_norm_loss,
-                "rmse": rmse_loss
+                "nll": "mean_std_norm_loss",
+                "rmse": "rmse_loss"
             }
             
             training_config["monitor_name"] = "nll"
@@ -173,10 +219,10 @@ def grid_searcher(
             misc_info["model_config"]["drop_rate"] = 0.2
 
 
-            training_config["train_loss"] = mean_std_norm_loss
+            training_config["train_loss"] = "mean_std_norm_loss"
             training_config["val_loss_criterias"] = {
-                "nll": mean_std_norm_loss,
-                "rmse": rmse_loss
+                "nll": "mean_std_norm_loss",
+                "rmse": "rmse_loss"
             }
             
             training_config["monitor_name"] = "nll"
@@ -191,10 +237,10 @@ def grid_searcher(
             misc_info["model_config"]["n_models"] = 5
 
 
-            training_config["train_loss"] = mean_std_forEnsemble
+            training_config["train_loss"] = "mean_std_forEnsemble"
             training_config["val_loss_criterias"] = {
-                "nll": mean_std_forEnsemble,
-                "rmse": rmse_loss
+                "nll": "mean_std_forEnsemble",
+                "rmse": "rmse_loss"
             }
             
             training_config["monitor_name"] = "nll"
@@ -205,10 +251,10 @@ def grid_searcher(
 
         elif model_name == "GPmodel": 
 
-            training_config["train_loss"] = mean_std_norm_loss
+            training_config["train_loss"] = "mean_std_norm_loss"
             training_config["val_loss_criterias"] = {
-                "nll": mean_std_norm_loss,
-                "rmse": rmse_loss
+                "nll": "mean_std_norm_loss",
+                "rmse": "rmse_loss"
             }
             training_config["num_samples"] = 10
             
@@ -225,10 +271,10 @@ def grid_searcher(
 
 
 
-            training_config["train_loss"] = BeyondPinball_muSigma
+            training_config["train_loss"] = "BeyondPinball_muSigma"
             training_config["val_loss_criterias"] = {
-                "beyondPinBall": BeyondPinball_muSigma,
-                "rmse": rmse_loss
+                "beyondPinBall": "BeyondPinball_muSigma",
+                "rmse": "rmse_loss"
             }
             
             training_config["monitor_name"] = "beyondPinBall"
@@ -242,10 +288,10 @@ def grid_searcher(
             misc_info["model_config"]["n_output"] = 1
 
 
-            training_config["train_loss"] = mse_loss
+            training_config["train_loss"] = "mse_loss"
             training_config["val_loss_criterias"] = {
-                "mse": mse_loss,
-                "rmse": rmse_loss
+                "mse": "mse_loss",
+                "rmse": "rmse_loss"
             }
             
             training_config["monitor_name"] = "mse"
@@ -321,6 +367,27 @@ def grid_searcher(
     handle.write("# -------------------------------------------------")
     handle.write("\n\n")
     handle.close()
+
+
+    # dump config records
+    config_name = model_name + "_on_" + dataset_name + "_config.yml"
+
+    empty_harvestor(harvestor)
+
+    training_config["LR"] = choice_LR
+    training_config["bat_size"] = choice_bat_size
+
+
+    with open(config_path+config_name, 'w') as config_handle:
+
+        yaml.dump(
+            {
+                "misc_info": misc_info,
+                "training_config": training_config,
+                "harvestor": harvestor
+            }, 
+            config_handle, 
+            default_flow_style=False)
 
 
 
@@ -429,15 +496,18 @@ if __name__ == "__main__":
 
 if __name__ == "__main__":
 
-    grid_searcher(
-        dataset_name = "wine",
-        num_repeat = 2,
-        model_name = "vanillaPred",
-        to_search = {
-            "LR": [1E-2, 5E-3],
-            "bat_size": [100, 600]
-        }
-    )
+    for key in model_callByName.keys():
+
+        print("model: ", key)
+        grid_searcher(
+            dataset_name = "wine",
+            num_repeat = 2,
+            model_name = key,
+            to_search = {
+                "LR": [1E-2, 5E-3],
+                "bat_size": [100, 600]
+            }
+        )
 
 
 

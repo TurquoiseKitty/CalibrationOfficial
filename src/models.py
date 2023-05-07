@@ -20,7 +20,8 @@ class raw_net(nn.Module):
             n_input,
             hidden_layers,
             drop_rate = 0.5,
-            device = torch.device('cuda')
+            device = torch.device('cuda'),
+            **kwargs
     ):
         super(raw_net, self).__init__()
 
@@ -74,7 +75,8 @@ class raw_net(nn.Module):
               patience = 10,
               monitor_name = "nll",
               backdoor = None,
-              harvestor = None
+              harvestor = None,
+              **kwargs
             ):
         
         optimizer = optim.Adam(self.parameters(), lr = LR, weight_decay=Decay)
@@ -196,7 +198,8 @@ class vanilla_predNet(raw_net):
             n_input,
             hidden_layers,
             n_output = 1,
-            device = torch.device('cuda')
+            device = torch.device('cuda'),
+            **kwargs
     ): 
 
         super(vanilla_predNet, self).__init__(
@@ -270,7 +273,8 @@ class quantile_predNet(vanilla_predNet):
             n_input,
             hidden_layers,
             n_output,
-            device = torch.device('cuda')
+            device = torch.device('cuda'),
+            **kwargs
     ): 
 
         super(quantile_predNet, self).__init__(
@@ -323,7 +327,8 @@ class MC_dropnet(raw_net):
             hidden_layers,
             n_output = 2,
             drop_rate = 0.1,
-            device = torch.device('cuda')
+            device = torch.device('cuda'),
+            **kwargs
     ): 
         
         # we only implement heteroskedastic setting
@@ -432,7 +437,8 @@ class Deep_Ensemble(raw_net):
             hidden_layers,
             n_output = 2,
             n_models = 5,
-            device = torch.device('cuda')
+            device = torch.device('cuda'),
+            **kwargs
     ):
         
         assert n_output == 2
