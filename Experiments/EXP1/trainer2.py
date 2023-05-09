@@ -498,6 +498,8 @@ if __name__ == "__main__":
     )
     '''
 
+
+    '''
     with open(os.getcwd()+"/Experiments/EXP1/config_bin/vanillaPred_on_energy_config.yml", 'r') as file:
         base_configs = yaml.safe_load(file)
 
@@ -513,6 +515,8 @@ if __name__ == "__main__":
         base_train_config= base_configs["training_config"],
         aux_config = {},
     )
+    '''
 
+    pass
 
 

@@ -102,3 +102,22 @@ def common_processor_UCI(x, y, recal_percent = 0.1, seed = 1234):
     train_Y, test_Y, recal_Y = y[train_idx], y[test_idx], y[recal_idx]
 
     return train_X, test_X, recal_X, train_Y, test_Y, recal_Y
+
+
+def ts_data_formulator(x, y, window_size = 5):
+    
+    assert len(x) == len(y)
+    
+    reshaped_x = []
+    
+    for i in range(window_size-1, len(y)):
+        
+        reshaped_x.append(x[i-window_size+1:i+1])
+        
+    return np.array(reshaped_x), y[window_size-1:]
+
+
+
+
+
+
