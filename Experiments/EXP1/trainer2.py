@@ -84,9 +84,11 @@ def grid_searcher_v2(
 
         x, y = get_uci_data(data_name= dataset_name, dir_name= dataset_path)
 
-        # now that data is not enough, we just use training set for recalibration
-        train_X, test_X, recal_X, train_Y, test_Y, recal_Y = common_processor_UCI(x, y, recal_percent= 0, seed = SEED)
-
+        if model_name == "vanillaKernel":
+            train_X, test_X, recal_X, train_Y, test_Y, recal_Y = common_processor_UCI(x, y, recal_percent= 0.5, seed = SEED)
+        else:
+            train_X, test_X, recal_X, train_Y, test_Y, recal_Y = common_processor_UCI(x, y, recal_percent= 0, seed = SEED)
+        
         train_X = torch.Tensor(train_X)
         train_Y = torch.Tensor(train_Y).to(torch.device(base_misc_info["model_config"]["device"]))
 
@@ -100,7 +102,8 @@ def grid_searcher_v2(
             model = base_model,
             training_config = base_train_config,
             harvestor = None,          
-            misc_info = base_misc_info
+            misc_info = base_misc_info,
+            diff_trainingset= True
         )
 
         # from now I guess we have finished training the first part of the model
@@ -177,10 +180,12 @@ def grid_searcher_v2(
 
             for wid in to_search["wid"]:
 
-                Z = train_X.cuda()
-                eps = (train_Y - base_model(train_X).view(-1)).detach().cuda()
+                recal_data_amount = 500
 
-                reg_X, reg_Y = tau_to_quant_datasetCreate(Z, epsilon=eps, quants= np.linspace(0,1,100),wid = wid)
+                Z = train_X[:recal_data_amount].cuda()
+                eps = (train_Y[:recal_data_amount] - base_model(Z).view(-1)).detach().cuda()
+
+                reg_X, reg_Y = tau_to_quant_datasetCreate(Z, epsilon=eps, quants= np.linspace(0.01,0.99,20),wid = wid)
 
             
 
@@ -224,7 +229,7 @@ def grid_searcher_v2(
 
                     val_X, val_Y = train_X[val_idx], train_Y[val_idx]
 
-                    quants = np.linspace(0,1,100)
+                    quants = np.linspace(0.01,0.99,100)
 
 
                     quant_bed = torch.Tensor(quants).view(-1, 1).repeat(1, len(val_X)).view(-1).to(val_X.device)
@@ -242,7 +247,7 @@ def grid_searcher_v2(
 
                     pred_Y = pred_eps + val_mean.view(1,-1).repeat(len(pred_eps),1)
 
-                    MACE_error = MACE_Loss(pred_Y,val_Y,q_list = np.linspace(0,1,100)).item()
+                    MACE_error = MACE_Loss(pred_Y,val_Y,q_list = np.linspace(0.01,0.99,100)).item()
 
                 
                     sub_summarizer[(LR, wid)] = MACE_error
@@ -254,22 +259,6 @@ def grid_searcher_v2(
             para_got = min(sub_summarizer.items(), key=operator.itemgetter(1))[0]
             summarizer.append(para_got)
             support_summ[para_got] = aid_summarizer[para_got]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -304,11 +293,12 @@ def grid_searcher_v2(
                     test_Z = val_X.cuda(),
                     recal_Z = recal_X.cuda(),
                     recal_epsilon = torch.Tensor(recal_Y - recal_mean).cuda(),
-                    quants = np.linspace(0,1,100)
+                    quants = np.linspace(0.01,0.99,100),
+                    wid= wid
                 )
 
                 y_diffQuants = eps_diffQuants + val_mean.view(1,-1).repeat(len(eps_diffQuants),1)
-                MACE_error = MACE_Loss(y_diffQuants,val_Y,q_list = np.linspace(0,1,100)).item()
+                MACE_error = MACE_Loss(y_diffQuants,val_Y,q_list = np.linspace(0.01,0.99,100)).item()
                 
 
                 sub_summarizer[(wid,)] = MACE_error

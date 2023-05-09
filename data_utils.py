@@ -81,7 +81,7 @@ def common_processor_UCI(x, y, recal_percent = 0.1, seed = 1234):
         N_recalibration = int(N_train * recal_percent)
         N_realTrain = N_train - N_recalibration
 
-        tr_idx_idx, recal_idx_idx = splitter(N_realTrain, N_recalibration)
+        tr_idx_idx, recal_idx_idx = splitter(N_realTrain, N_recalibration, seed = seed)
 
         recal_idx = tr_idx[recal_idx_idx]
 
@@ -91,15 +91,14 @@ def common_processor_UCI(x, y, recal_percent = 0.1, seed = 1234):
 
         # when not enough data, we may also use training set for recalibration
 
-        train_idx = np.arange(N_train)
+        train_idx = tr_idx
 
-        recal_idx = np.arange(N_train)
+        recal_idx = tr_idx
 
     
     
     train_X, test_X, recal_X = x[train_idx], x[test_idx], x[recal_idx]
 
     train_Y, test_Y, recal_Y = y[train_idx], y[test_idx], y[recal_idx]
-
 
     return train_X, test_X, recal_X, train_Y, test_Y, recal_Y

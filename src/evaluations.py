@@ -44,44 +44,6 @@ def mu_sig_toQuants(
 
 
 
-'''
-def mean_absolute_calibration_error(
-    x_true,
-    y_true,
-    quantile_array_producers,         # give x and quantile level tau, produce quantie arrays
-    num_bins = 100,
-    iso_model = None
-) -> float:
-    
-    assert isinstance(y_true, np.ndarray)
-    assert len(y_true.shape) == 1
-
-    exp_proportions = np.linspace(0, 1, num_bins)
-    obs_proportions = np.zeros(num_bins)
-
-    if iso_model is not None:
-        in_exp_proportions = iso_model.predict(exp_proportions)
-    else:
-        in_exp_proportions = exp_proportions
-
-    y_quant_pred_arr = quantile_array_producers(x_true, in_exp_proportions)
-
-    assert y_quant_pred_arr.shape == (len(exp_proportions), len(x_true))
-
-    for i in range(len(in_exp_proportions)):
-
-        obs_proportions[i] = cali_error_givenQuantile(y_quant_pred_arr[i], y_true)
-
-
-    abs_diff_proportions = np.abs(exp_proportions - obs_proportions)
-    mace = np.mean(abs_diff_proportions)
-
-    return mace
-'''
-
-
-
-
 
 
 

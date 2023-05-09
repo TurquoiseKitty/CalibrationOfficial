@@ -1,7 +1,7 @@
 from data_utils import seed_all, splitter, common_processor_UCI, get_uci_data
 import os
 from src.models import vanilla_predNet, MC_dropnet, Deep_Ensemble
-from src.losses import mse_loss, rmse_loss, mean_std_norm_loss, mean_std_forEnsemble, BeyondPinball_muSigma, MMD_Loss, MACE_Loss, MACE_muSigma
+from src.losses import mse_loss, rmse_loss, mean_std_norm_loss, mean_std_forEnsemble, BeyondPinball_muSigma, MMD_Loss, MACE_Loss, MACE_muSigma, AGCE_Loss, AGCE_muSigma, avg_pinball_quantile, avg_pinball_muSigma
 import torch
 from src.GPmodels import oneLayer_DeepGP
 import time
@@ -33,7 +33,12 @@ loss_callByName = {
     "BeyondPinball_muSigma": BeyondPinball_muSigma,
     "MMD_Loss": MMD_Loss,
     "MACE_Loss": MACE_Loss,
-    "MACE_muSigma": MACE_muSigma
+    "MACE_muSigma": MACE_muSigma,
+    "AGCE_Loss": AGCE_Loss,
+    "AGCE_muSigma": AGCE_muSigma,
+    "CheckScore": avg_pinball_quantile,
+    "CheckScore_muSigma": avg_pinball_muSigma
+
 }
 
 
@@ -58,6 +63,7 @@ def trainer(     # describs a training process
         training_config,    # a dictionary that will provide instructions for the model to train
         harvestor,          # will harvest whatever data that might be useful during the experiment
         misc_info,          # a dictionary that contains additional instructions
+        diff_trainingset = False
 ):
     
     seed_all(seed)
@@ -65,9 +71,9 @@ def trainer(     # describs a training process
     misc_info = copy.deepcopy(misc_info)
     training_config = copy.deepcopy(training_config)
 
-
-    assert misc_info["input_x_shape"] == list(raw_train_X.shape)
-    assert misc_info["input_y_shape"] == list(raw_train_Y.shape)
+    if not diff_trainingset:
+        assert misc_info["input_x_shape"] == list(raw_train_X.shape)
+        assert misc_info["input_y_shape"] == list(raw_train_Y.shape)
 
     
     # an additional steps to convert the cofigs
@@ -90,7 +96,7 @@ def trainer(     # describs a training process
         
         misc_info["model_init"] = model_callByName[misc_info["model_init"]]
 
-        model = misc_info["model_init"](**misc_info["model_config"])
+        model = misc_info["model_init"](**misc_info["model_config"], seed = seed)
 
     
 
@@ -107,6 +113,7 @@ def trainer(     # describs a training process
 
     split_percet = misc_info["val_percentage"]
     N_val = int(split_percet*len(raw_train_Y))
+
 
     train_idx, val_idx = splitter(len(raw_train_Y)-N_val, N_val, seed = seed)
 

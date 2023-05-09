@@ -135,20 +135,24 @@ def avg_pinball_quantile(y_out, Y, q_list = np.array([0.2, 0.8])):
 
     # when the net predicts quantiles directly
 
-    assert len(y_out) == len(Y)
 
-    assert y_out.shape == (len(y_out), len(q_list))
+    assert (y_out.shape == (len(Y), len(q_list))) or (y_out.shape == (len(q_list), len(Y)))
 
     q_list_bed =  torch.Tensor(q_list).view(-1, 1).repeat(1, len(Y)).view(-1).to(y_out.device)
 
-    y_pred = torch.permute(y_out, (1, 0)).reshape(-1,)
+
+    if y_out.shape == (len(y_out), len(q_list)):
+        y_pred = torch.permute(y_out, (1, 0)).reshape(-1,)
+    
+    else:
+        y_pred = y_out.reshape(-1,)
 
     y_pred_Plus_tau =  torch.stack([y_pred, q_list_bed],dim=1)
 
     return avg_pinball(y_pred_Plus_tau, Y.repeat(len(q_list)))
 
 
-def avg_pinball_muSigma(y_out, Y, q_list = np.linspace(0,1,20)):
+def avg_pinball_muSigma(y_out, Y, q_list = np.linspace(0.01,0.99,100), recal=False, recal_model=None):
 
     assert len(y_out) == len(Y)
 
@@ -158,16 +162,17 @@ def avg_pinball_muSigma(y_out, Y, q_list = np.linspace(0,1,20)):
 
     mu_bed = y_out[:, 0].repeat(len(q_list))
     sigma_bed = y_out[:, 1].repeat(len(q_list))
-    quant_bed = torch.Tensor(np.clip(normalZ.ppf(q_list), a_min = -1E5, a_max= 1E5)).view(-1, 1).repeat(1, len(Y)).view(-1).to(y_out.device)
+
+    if not recal:
+        quant_bed = torch.Tensor(np.clip(normalZ.ppf(q_list), a_min = -1E5, a_max= 1E5)).view(-1, 1).repeat(1, len(Y)).view(-1).to(y_out.device)
+    else:
+        quant_bed = torch.Tensor(np.clip(normalZ.ppf(recal_model.predict(q_list)), a_min = -1E5, a_max= 1E5)).view(-1, 1).repeat(1, len(Y)).view(-1).to(y_out.device)
 
     y_pred = mu_bed + sigma_bed * quant_bed
 
     y_pred_Plus_tau =  torch.stack([y_pred, q_list_bed],dim=1)
 
     return avg_pinball(y_pred_Plus_tau, Y.repeat(len(q_list)))
-
-
-
 
 
 
@@ -241,7 +246,7 @@ def BeyondPinball_quantile(y_out, Y, q_list = np.array([0.2, 0.8])):
 
 
 
-def BeyondPinball_muSigma(y_out, Y, q_list = np.linspace(0,1,100)):
+def BeyondPinball_muSigma(y_out, Y, q_list = np.linspace(0.01,0.99,100)):
 
     assert len(y_out) == len(Y)
 
@@ -268,8 +273,9 @@ def BeyondPinball_muSigma(y_out, Y, q_list = np.linspace(0,1,100)):
 def MACE_Loss(
     y_out,
     Y,
-    q_list = np.linspace(0, 1, 100),
+    q_list = np.linspace(0.01, 0.99, 100),
 ):
+
 
     assert y_out.shape == (len(q_list), len(Y))
 
@@ -281,14 +287,88 @@ def MACE_Loss(
     return mace
 
 def MACE_muSigma(
-    y_out, Y, q_list = np.linspace(0,1,100)
+    y_out, Y, q_list = np.linspace(0.01,0.99,100), recal=False, recal_model = None
 ):
     assert len(y_out) == len(Y)
 
     assert y_out.shape == (len(y_out), 2)
 
-    y_quants = mu_sig_toQuants(y_out[:,0], y_out[:, 1], quantiles = q_list)
+    if not recal:
+
+        y_quants = mu_sig_toQuants(y_out[:,0], y_out[:, 1], quantiles = q_list)
+
+    else:
+
+        y_quants = mu_sig_toQuants(y_out[:,0], y_out[:, 1], quantiles = recal_model.predict(q_list))
 
     return MACE_Loss(y_quants, Y, q_list)
 
+
+
+
+def AGCE_Loss(
+    y_out,
+    Y,
+    
+    ratio = 0.1,
+    q_list = np.linspace(0.01, 0.99, 100),
+    draw_with_replacement: bool = False,
+    num_trials: int = 1,
+    num_group_draws: int = 10
+):
+
+    assert y_out.shape == (len(q_list), len(Y))
+
+    num_pts = Y.shape[0]
+     
+    group_size = max([int(round(num_pts * ratio)), 2])
+        
+    score_per_trial = []  # list of worst miscalibrations encountered
+
+    for _ in range(num_trials):
+            
+        group_miscal_scores = []
+
+        for g_idx in range(num_group_draws):
+            
+            rand_idx = np.random.choice(
+                num_pts, group_size, replace=draw_with_replacement
+            )
+
+
+            MACE_error = MACE_Loss(y_out[:,rand_idx], Y[rand_idx], q_list= q_list).item()
+
+            group_miscal_scores.append(MACE_error)
+                
+                
+        max_miscal_score = np.max(group_miscal_scores)
+        score_per_trial.append(max_miscal_score)
+            
+
+    return np.mean(score_per_trial)
+
+
+def AGCE_muSigma(
+    y_out, Y, 
+    ratio = 0.1,
+    q_list = np.linspace(0.01, 0.99, 100),
+    draw_with_replacement: bool = False,
+    num_trials: int = 1,
+    num_group_draws: int = 10,
+    recal=False,
+    recal_model = None
+):
+    assert len(y_out) == len(Y)
+
+    assert y_out.shape == (len(y_out), 2)
+
+    if not recal:
+
+        y_quants = mu_sig_toQuants(y_out[:,0], y_out[:, 1], quantiles = q_list)
+
+    else:
+
+        y_quants = mu_sig_toQuants(y_out[:,0], y_out[:, 1], quantiles = recal_model.predict(q_list))
+
+    return AGCE_Loss(y_quants, Y, ratio, q_list, draw_with_replacement, num_trials, num_group_draws)
 

@@ -42,7 +42,7 @@ def CHECK_kernelEsti():
         test_Z = torch.Tensor(test_X).view(-1, 1).cuda(),
         recal_Z = torch.Tensor(recal_X).view(-1, 1).cuda(),
         recal_epsilon = torch.Tensor(recal_Y - recal_mean).cuda(),
-        quants = [Lower_quant, Upper_quant]
+        quants = [Lower_quant, 0.5]
     ).cpu().numpy()
 
     plot_xy_specifyBound(
