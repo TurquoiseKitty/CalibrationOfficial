@@ -21,7 +21,8 @@ def plot_xy_specifyBound(
     leg_loc: Union[int, str] = 3,
     ax: Union[matplotlib.axes.Axes, None] = None,
     interval_coverage = "95\%",
-    title = None
+    title = None,
+    dashStyle = False
 ) -> matplotlib.axes.Axes:
     
     # Create ax if it doesn't exist
@@ -46,7 +47,10 @@ def plot_xy_specifyBound(
 
 
     h1 = ax.plot(x, y_true, ".", mec="#ff7f0e", mfc="None")
-    h2 = ax.plot(x, y_pred, "-", c="#1f77b4", linewidth=2)
+    if dashStyle:
+        h2 = ax.plot(x, y_pred, "--", c="#1f77b4", linewidth=2)
+    else:
+        h2 = ax.plot(x, y_pred, "-", c="#1f77b4", linewidth=2)
     h3 = ax.fill_between(
         x,
         y_LO,

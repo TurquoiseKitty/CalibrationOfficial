@@ -1,5 +1,5 @@
 import torch
-from trainer import model_callByName, loss_callByName
+from Experiments.EXP1.trainer import model_callByName, loss_callByName
 from src.kernel_methods import kernel_estimator
 import numpy as np
 
@@ -173,14 +173,22 @@ def testPerform_projKernel(
 ):
 
 
-    assert model_name in ["vanillaKernel_RandomProj", "vanillaKernel_CovSelect"]
+    assert model_name in ["RFKernel_RandomProj", "vanillaKernel_RandomProj", "vanillaKernel_CovSelect"]
 
     # return a single value for each criteria
 
     ret = {}
 
-    recal_mean = model.predict(recal_X).view(-1)
-    test_mean = model.predict(test_X).view(-1)
+    if model_name in ["RFKernel_RandomProj"]:
+        
+        recal_mean = torch.Tensor(model.predict(recal_X.cpu().numpy())).cuda()
+        test_mean = torch.Tensor(model.predict(test_X.cpu().numpy())).cuda()
+
+
+    elif model_name in ["vanillaKernel_RandomProj", "vanillaKernel_CovSelect"]:
+
+        recal_mean = model.predict(recal_X).view(-1)
+        test_mean = model.predict(test_X).view(-1)
 
     test_Z =  reformer(test_X)
     recal_Z = reformer(recal_X)
