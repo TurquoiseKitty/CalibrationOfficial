@@ -187,13 +187,20 @@ def testPerform_projKernel(
 
     elif model_name in ["vanillaKernel_RandomProj", "vanillaKernel_CovSelect"]:
 
+        
+
         recal_mean = model.predict(recal_X).view(-1)
+        # recal_mean = model(recal_X).view(-1)
+
         test_mean = model.predict(test_X).view(-1)
 
     test_Z =  reformer(test_X)
+
     recal_Z = reformer(recal_X)
 
+    
 
+    
     eps_diffQuants = kernel_estimator(
         test_Z = test_Z.cuda(),
         recal_Z = recal_Z.cuda(),

@@ -22,7 +22,10 @@ def plot_xy_specifyBound(
     ax: Union[matplotlib.axes.Axes, None] = None,
     interval_coverage = "95\%",
     title = None,
-    dashStyle = False
+    x_label = "$x$",
+    y_label = "$y$",
+    dashStyle = False,
+    legend = True
 ) -> matplotlib.axes.Axes:
     
     # Create ax if it doesn't exist
@@ -58,11 +61,13 @@ def plot_xy_specifyBound(
         color="lightsteelblue",
         alpha=0.4,
     )
-    ax.legend(
-        [h1[0], h2[0], h3],
-        ["Observations", "Predictions", interval_coverage + " Interval"],
-        loc=leg_loc,
-    )
+
+    if legend:
+        ax.legend(
+            [h1[0], h2[0], h3],
+            ["Observations", "Predictions", interval_coverage + " Interval"],
+            loc=leg_loc,
+        )
 
     # Format plot
     if ylims is not None:
@@ -71,13 +76,13 @@ def plot_xy_specifyBound(
     if xlims is not None:
         ax.set_xlim(xlims)
 
-    ax.set_xlabel("$x$")
-    ax.set_ylabel("$y$")
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
     if title is not None:
         ax.set_title(title)
     else:
         ax.set_title("Confidence Band")
-    ax.set_aspect(1.0 / ax.get_data_ratio(), adjustable="box")
+    # ax.set_aspect(1.0 / ax.get_data_ratio(), adjustable="box")
 
     return ax
 

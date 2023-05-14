@@ -4,6 +4,7 @@ from sklearn.preprocessing import StandardScaler
 import random
 import os
 import torch
+import pandas as pd
 
 
 def GENERATE_hetero_noise(
@@ -104,6 +105,10 @@ def common_processor_UCI(x, y, recal_percent = 0.1, seed = 1234):
     return train_X, test_X, recal_X, train_Y, test_Y, recal_Y
 
 
+
+
+
+
 def ts_data_formulator(x, y, window_size = 5):
     
     assert len(x) == len(y)
@@ -117,6 +122,30 @@ def ts_data_formulator(x, y, window_size = 5):
     return np.array(reshaped_x), y[window_size-1:]
 
 
+
+
+def california_housing_process(path = "Dataset/CaliforniaHousing/housing.csv"):
+
+    df = pd.read_csv('Dataset/CaliforniaHousing/housing.csv')
+    df = df.dropna(axis = 0)
+
+    # log transformation 
+    t = 9e-1
+    df['total_rooms'] = np.log(df['total_rooms'] + t)
+    df['total_bedrooms'] = np.log(df['total_bedrooms'] + t)
+    df['population']  = np.log(df['population'] +t)
+    df['households'] = np.log(df['households'] + t)
+    df['total_rooms'] = np.log(df['total_rooms'] + t)
+
+    for column in df.drop(columns=['ocean_proximity','median_house_value' ]).columns:
+        df[column] = (df[column] - np.mean(df[column])) / np.std(df[column])
+        
+    df = pd.get_dummies(df)
+
+    x = np.array(df.drop(columns = ['median_house_value']).values)
+    y = np.array(df.median_house_value.values) / 1E4
+
+    return x, y
 
 
 
