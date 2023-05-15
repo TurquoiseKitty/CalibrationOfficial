@@ -47,14 +47,12 @@ if __name__ == "__main__":
 
         for k in range(num_repeat):
 
-            SEED = base_seed + k
-
-            seed_all(SEED)
+    
 
             N_train = int(len(x)*0.7)
             N_recal = int(len(x)*0.3)
 
-            tr_idx, recal_idx = splitter(N_train, N_recal, seed = SEED)
+            tr_idx, recal_idx = splitter(N_train, N_recal)
             train_X, train_Y = x[tr_idx], y[tr_idx]
 
             recal_X, recal_Y = x[recal_idx], y[recal_idx]
@@ -93,9 +91,8 @@ if __name__ == "__main__":
 
         for key in crits_dic.keys():
             
-            err_mu_dic[key] = np.mean(crits_dic[key])
-            
-            err_std_dic[key] = np.std(crits_dic[key]) / np.sqrt(len(crits_dic[key]))
+            err_mu_dic[key] = (max(crits_dic[key]) + min(crits_dic[key]))/2
+            err_std_dic[key] = (max(crits_dic[key]) - min(crits_dic[key]))/2
 
 
 

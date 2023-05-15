@@ -53,7 +53,6 @@ if __name__ == "__main__":
 
         for k in range(num_repeat):
 
-            SEED = base_seed + k
 
 
             N_train = int(len(x)*0.7)
@@ -98,9 +97,8 @@ if __name__ == "__main__":
 
         for key in crits_dic.keys():
             
-            err_mu_dic[key] = np.mean(crits_dic[key])
-            
-            err_std_dic[key] = np.std(crits_dic[key]) / np.sqrt(len(crits_dic[key]))
+            err_mu_dic[key] = (max(crits_dic[key]) + min(crits_dic[key]))/2
+            err_std_dic[key] = (max(crits_dic[key]) - min(crits_dic[key]))/2
 
 
 

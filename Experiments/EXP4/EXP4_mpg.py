@@ -69,7 +69,6 @@ if __name__ == "__main__":
 
         for k in range(num_repeat):
 
-            SEED = base_seed + k
 
             base_model = model_callByName[base_misc_info["model_init"]](**base_misc_info["model_config"])
 
@@ -82,7 +81,6 @@ if __name__ == "__main__":
 
             
             trainer(
-                seed = SEED,
                 raw_train_X = train_X,
                 raw_train_Y = train_Y,
                 model = base_model,
