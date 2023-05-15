@@ -56,17 +56,18 @@ def empty_harvestor(harvestor):
 
 
 def trainer(     # describs a training process
-        seed,       # key for the experiment to be reproducible
         raw_train_X,
         raw_train_Y,
         model,
         training_config,    # a dictionary that will provide instructions for the model to train
         harvestor,          # will harvest whatever data that might be useful during the experiment
         misc_info,          # a dictionary that contains additional instructions
-        diff_trainingset = False
+        diff_trainingset = False,
+        seed = None
 ):
     
-    seed_all(seed)
+    if seed:
+        seed_all(seed)
 
     misc_info = copy.deepcopy(misc_info)
     training_config = copy.deepcopy(training_config)

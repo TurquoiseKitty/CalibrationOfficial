@@ -54,7 +54,9 @@ def seed_all(seed = 1234):
 
 def splitter(N1, N2, seed = 1234):
 
-    seed_all(seed)
+    if seed:
+
+        seed_all(seed)
 
     fullen = N1 + N2
 
@@ -63,7 +65,7 @@ def splitter(N1, N2, seed = 1234):
     return idx_permu[:N1], idx_permu[N1:]
 
 
-def common_processor_UCI(x, y, recal_percent = 0.1, seed = 1234):
+def common_processor_UCI(x, y, recal_percent = 0.1, seed = None):
 
     assert len(x.shape) == 2
     assert len(y.shape) == 1
